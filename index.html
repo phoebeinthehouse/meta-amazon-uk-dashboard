@@ -328,8 +328,9 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
 const API_URL='https://script.google.com/macros/s/AKfycbzxCoy9uj0X7IInXAhi4OHjciZBC1vq3mqC3q0O5uwfdytufvEfIl7y8Ci-RV8pnl7t/exec';
 const META_SHEET='meta-raw-new-uk';
 const META_URL=API_URL+'?sheet='+encodeURIComponent(META_SHEET);
+const ADS_LIST_URL=API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
 let AD_IMAGES=[];
-function driveUrl(u){const m=u.match(/\/d\/([^/]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]+'=s400':u;}
+function driveUrl(u){const m=u.match(/\/d\/([^/?]+)/)||u.match(/[?&]id=([^&]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]+'=s400':u;}
 function getAdImg(adName,product,person,from,to,media){
   if(!adName)return'';
   const lc=adName.toLowerCase();
@@ -376,7 +377,7 @@ let RAW={meta:[],amz:[]};
 const CACHE_TTL=30*60*1000;
 function getCached(k){try{const i=localStorage.getItem(k);if(!i)return null;const{ts,d}=JSON.parse(i);if(Date.now()-ts>CACHE_TTL){localStorage.removeItem(k);return null;}return d;}catch(e){return null;}}
 function setCached(k,d){try{localStorage.setItem(k,JSON.stringify({ts:Date.now(),d}));}catch(e){}}
-function clearCache(){['meta_raw_new_uk'].forEach(k=>localStorage.removeItem(k));}
+function clearCache(){['meta_raw_new_uk','meta_ads_list'].forEach(k=>localStorage.removeItem(k));}
 let curPage='creator',cM='clicks',cPM='clicks';
 let dateMode='monthly',curMonth='2026-03',customFrom='',customTo='';
 let cFilters={person:'All',media:'All',product:'All'};
@@ -497,6 +498,32 @@ async function loadData(){
 
     // Build ad_name → image URL map
     AD_IMAGES=[];
+    try{
+      let adsList=getCached('meta_ads_list');
+      if(!adsList){
+        const response=await fetch(ADS_LIST_URL,fetchOpts);
+        if(!response.ok)throw new Error('thumbnail request failed ('+response.status+')');
+        adsList=await response.text();
+        setCached('meta_ads_list',adsList);
+      }
+      AD_IMAGES=arrToObjs(adsList).map(r=>{
+        const keys=Object.keys(r);
+        const nameKey=keys.find(k=>/소재명|ad[ _-]?name|creative|file[ _-]?name|파일명|^name$/i.test(k));
+        const urlKey=keys.find(k=>/썸네일|thumbnail|thumb|이미지|image|url|링크|link/i.test(k));
+        const dateKey=keys.find(k=>/일자|날짜|date/i.test(k));
+        const values=Object.values(r).map(v=>String(v||'').trim());
+        const rawUrl=String((urlKey&&r[urlKey])||values.find(v=>/https?:\/\//i.test(v))||'');
+        const urlMatch=rawUrl.match(/https?:\/\/[^"')\s]+/i);
+        const rawName=String((nameKey&&r[nameKey])||values.find(v=>v.includes('_')&&!/https?:\/\//i.test(v))||'').trim();
+        return{
+          n:rawName,
+          u:urlMatch?urlMatch[0]:'',
+          d:parseDateStr(dateKey?r[dateKey]:'')||''
+        };
+      }).filter(x=>x.n&&x.u);
+    }catch(e){
+      console.warn('[THUMBNAILS] meta-ads-list load failed:',e);
+    }
 
     function parseNum(v){return parseFloat(String(v||'0').replace(/,/g,'').replace(/-/g,'0'))||0;}
     function parseDateStr(raw){
