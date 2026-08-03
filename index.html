@@ -885,8 +885,8 @@ function updateMeta(){
   const notice=document.getElementById('novNotice');
   notice.style.display=(noAmz||partialAmz)?'block':'none';
   notice.textContent=noAmz
-    ?'Amazon purchase and revenue data starts on Jul 23, 2026. This period shows Meta metrics only.'
-    :'Amazon purchase and revenue data is included from Jul 23, 2026; earlier dates in this range have no Amazon data.';
+    ?'Amazon 구매 데이터는 2026년 7월 23일부터 제공됩니다. 이 기간의 구매 지표는 Meta의 ShopNowClick으로 표시됩니다.'
+    :'Amazon 구매 데이터는 2026년 7월 23일부터 제공됩니다. 선택 기간이 7월 23일을 포함하므로 Purchases에는 7월 23일 이후의 실제 Amazon 구매만 집계되며, 이전 ShopNowClick은 합산하지 않습니다.';
 }
 
 function refresh(){
