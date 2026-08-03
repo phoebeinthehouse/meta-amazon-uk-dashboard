@@ -186,7 +186,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="tab active" onclick="switchM('clicks',this)">Clicks</button>
       <button class="tab" onclick="switchM('ctr',this)">CTR</button>
       <button class="tab" onclick="switchM('cpc',this)">CPC</button>
-      <button class="tab" onclick="switchM('purchases',this)">Purchases</button>
+      <button class="tab" id="creatorPurchaseTab" onclick="switchM('purchases',this)">Purchases</button>
       <button class="tab" onclick="switchM('roas',this)">ROAS</button>
     </div>
   </div>
@@ -342,13 +342,16 @@ const NEW_API_URL='https://script.google.com/macros/s/AKfycbyuwAWMPtF_zybgo3WVIn
 const OLD_META_URL=OLD_API_URL+'?sheet='+encodeURIComponent('meta-raw-new-uk');
 const NEW_META_URL=NEW_API_URL+'?sheet='+encodeURIComponent('meta-raw');
 const AMZ_URL=NEW_API_URL+'?sheet='+encodeURIComponent('amz-raw');
-const ADS_LIST_URL=OLD_API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
+const OLD_ADS_LIST_URL=OLD_API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
+const NEW_ADS_LIST_URL=NEW_API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
 const META_NEW_START='2026-08-01';
 const AMZ_START='2026-07-23';
 let AD_IMAGES=[];
 function driveUrl(u){const m=u.match(/\/d\/([^/?]+)/)||u.match(/[?&]id=([^&]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]+'=s400':u;}
 function getAdImg(adName,product,person,from,to,media){
   if(!adName)return'';
+  const sourcePreference=from>=META_NEW_START?'new':to<META_NEW_START?'old':null;
+  const images=sourcePreference?AD_IMAGES.filter(x=>x.s===sourcePreference):AD_IMAGES;
   const lc=adName.toLowerCase();
   const personLc=(person&&person!=='Partner')?person.toLowerCase():null;
   const PC={'BCA/BPD':['BCA','BPD','PCF']};
@@ -369,14 +372,14 @@ function getAdImg(adName,product,person,from,to,media){
     return ranged.length?latest(ranged):arr[0];
   };
   if(codes.length){
-    const matches=AD_IMAGES.filter(x=>mt(x)&&codes.some(c=>x.n.split('_')[4]===c)&&mp(x)&&mm(x));
+    const matches=images.filter(x=>mt(x)&&codes.some(c=>x.n.split('_')[4]===c)&&mp(x)&&mm(x));
     if(matches.length){const e=best(matches);return driveUrl(e.u);}
   }
-  const matches=AD_IMAGES.filter(x=>mt(x)&&mp(x)&&mm(x));
+  const matches=images.filter(x=>mt(x)&&mp(x)&&mm(x));
   if(matches.length){const e=best(matches);return driveUrl(e.u);}
-  const nameMatches=AD_IMAGES.filter(x=>mt(x)&&mm(x));
+  const nameMatches=images.filter(x=>mt(x)&&mm(x));
   if(nameMatches.length){const e=best(nameMatches);return driveUrl(e.u);}
-  const anyMatches=AD_IMAGES.filter(x=>mt(x));
+  const anyMatches=images.filter(x=>mt(x));
   if(anyMatches.length){const e=best(anyMatches);return driveUrl(e.u);}
   return'';
 }
@@ -393,7 +396,7 @@ let RAW={meta:[],amz:[]};
 const CACHE_TTL=30*60*1000;
 function getCached(k){try{const i=localStorage.getItem(k);if(!i)return null;const{ts,d}=JSON.parse(i);if(Date.now()-ts>CACHE_TTL){localStorage.removeItem(k);return null;}return d;}catch(e){return null;}}
 function setCached(k,d){try{localStorage.setItem(k,JSON.stringify({ts:Date.now(),d}));}catch(e){}}
-function clearCache(){['old_meta_raw_uk_v2','new_meta_raw_uk_v2','new_amz_raw_uk_v2','meta_ads_list'].forEach(k=>localStorage.removeItem(k));}
+function clearCache(){['old_meta_raw_uk_v2','new_meta_raw_uk_v2','new_amz_raw_uk_v2','old_meta_ads_list_v2','new_meta_ads_list_v2'].forEach(k=>localStorage.removeItem(k));}
 let curPage='creator',cM='clicks',cPM='clicks';
 let dateMode='monthly',curMonth='2026-03',customFrom='',customTo='';
 let cFilters={person:'All',media:'All',product:'All'};
@@ -532,15 +535,17 @@ async function loadData(){
     // tab after meta-raw to avoid intermittent redirect/rate-limit failures.
     const amzText=await fetchTextCached('new_amz_raw_uk_v2',AMZ_URL,'Amazon sheet');
 
-    // Build ad_name → image URL map
+    // Build ad_name → image URL map. Jul and earlier use the old sheet;
+    // Aug onward uses the new sheet.
     AD_IMAGES=[];
     try{
-      const adsList=await fetchTextCached('meta_ads_list',ADS_LIST_URL,'Thumbnail sheet');
-      AD_IMAGES=arrToObjs(adsList).map(r=>{
+      const oldAdsList=await fetchTextCached('old_meta_ads_list_v2',OLD_ADS_LIST_URL,'Old thumbnail sheet');
+      const newAdsList=await fetchTextCached('new_meta_ads_list_v2',NEW_ADS_LIST_URL,'New thumbnail sheet');
+      const parseAdImages=(text,source)=>arrToObjs(text).map(r=>{
         const keys=Object.keys(r);
         const nameKey=keys.find(k=>/소재명|ad[ _-]?name|creative|file[ _-]?name|파일명|^name$/i.test(k));
         const urlKey=keys.find(k=>/썸네일|thumbnail|thumb|이미지|image|url|링크|link/i.test(k));
-        const dateKey=keys.find(k=>/일자|날짜|date/i.test(k));
+        const dateKey=keys.find(k=>/일자|날짜|date|스냅샷|snapshot|utc/i.test(k));
         const values=Object.values(r).map(v=>String(v||'').trim());
         const rawUrl=String((urlKey&&r[urlKey])||values.find(v=>/https?:\/\//i.test(v))||'');
         const urlMatch=rawUrl.match(/https?:\/\/[^"')\s]+/i);
@@ -548,9 +553,14 @@ async function loadData(){
         return{
           n:rawName,
           u:urlMatch?urlMatch[0]:'',
-          d:parseDateStr(dateKey?r[dateKey]:'')||''
+          d:parseDateStr(dateKey?r[dateKey]:'')||'',
+          s:source
         };
       }).filter(x=>x.n&&x.u);
+      const oldImages=parseAdImages(oldAdsList,'old').filter(x=>!x.d||x.d<META_NEW_START);
+      const newImages=parseAdImages(newAdsList,'new').filter(x=>!x.d||x.d>=META_NEW_START);
+      AD_IMAGES=[...oldImages,...newImages];
+      console.log('[THUMBNAIL SOURCES]',{old:oldImages.length,new:newImages.length,cutover:META_NEW_START});
     }catch(e){
       console.warn('[THUMBNAILS] meta-ads-list load failed:',e);
     }
@@ -771,6 +781,8 @@ function D(){const{from,to}=getDateRange();return computeData(from,to);}
 function getDateLabel(){return dateMode==='monthly'?monthLabel(curMonth):customFrom+' ~ '+customTo;}
 function isNoAmz(){const{to}=getDateRange();return to<AMZ_START;}
 function isPartialAmz(){const{from,to}=getDateRange();return from<AMZ_START&&to>=AMZ_START;}
+function creatorMetric(){return cM==='purchases'&&isNoAmz()?'shopnowclick':cM;}
+function creatorPurchaseLabel(){return isNoAmz()?'ShopNowClick':'Purchases';}
 
 function fmtLocalDate(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -865,6 +877,7 @@ function computeCreativeDaily(days,productFilter,personFilter){
 
 function updateMeta(){
   const lbl=getDateLabel(),noAmz=isNoAmz(),partialAmz=isPartialAmz();
+  document.getElementById('creatorPurchaseTab').textContent=creatorPurchaseLabel();
   ['creatorMeta','productMeta','creativeMeta','weeklyMeta','weeklyCreativeMeta'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.textContent=lbl+(noAmz?' · Meta only':partialAmz?' · Amazon from Jul 23':' · Meta + Amazon');
@@ -919,17 +932,19 @@ function goPage(pg,btn){
 
 function renderPCards(){
   const ps=D().ps||[];
+  const metric=creatorMetric();
   const sorted={
     clicks:[...ps].sort((a,b)=>b.clicks-a.clicks).map(x=>x.person),
     ctr:[...ps].sort((a,b)=>b.ctr-a.ctr).map(x=>x.person),
     cpc:[...ps].sort((a,b)=>a.cpc-b.cpc).map(x=>x.person),
+    shopnowclick:[...ps].sort((a,b)=>b.shopnowclick-a.shopnowclick).map(x=>x.person),
     purchases:[...ps].sort((a,b)=>b.purchases-a.purchases).map(x=>x.person),
     roas:[...ps].sort((a,b)=>b.roas-a.roas).map(x=>x.person)
   };
-  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',purchases:'Purchases',roas:'ROAS'};
+  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',shopnowclick:'ShopNowClick',purchases:'Purchases',roas:'ROAS'};
   const noAmz=isNoAmz();
   document.getElementById('pcards').innerHTML=ps.map(p=>{
-    const rank=sorted[cM].indexOf(p.person)+1;
+    const rank=sorted[metric].indexOf(p.person)+1;
     const pm=D().pm||[];
     const vdo=pm.find(m=>m.person===p.person&&m.media==='vdo');
     const img=pm.find(m=>m.person===p.person&&m.media==='img');
@@ -937,14 +952,14 @@ function renderPCards(){
     const vp=tc>0?Math.round((vdo?.clicks||0)/tc*100):0;
     return '<div class="pcard">'+
       '<div class="ph"><div class="av" style="background:'+CB[p.person]+';color:'+CT[p.person]+'">'+p.person[0]+'</div>'+
-      '<div><div class="pname">'+p.person+'</div><div class="prank">Rank #'+rank+' by '+rl[cM]+'</div></div></div>'+
+      '<div><div class="pname">'+p.person+'</div><div class="prank">Rank #'+rank+' by '+rl[metric]+'</div></div></div>'+
       '<div class="srow">'+
       '<div class="st"><div class="stl">Clicks</div><div class="stv">'+f(p.clicks)+'</div></div>'+
       '<div class="st"><div class="stl">CTR</div><div class="stv">'+fd(p.ctr)+'%</div></div>'+
       '<div class="st"><div class="stl">CPC</div><div class="stv">₩'+f(p.cpc)+'</div></div>'+
       '</div><div class="srow">'+
       '<div class="st"><div class="stl">Spend</div><div class="stv sm">₩'+f(p.spend)+'</div></div>'+
-      '<div class="st"><div class="stl">Purchases</div><div class="stv'+(p.purchases>0?' good':'')+'">'+(noAmz?'—':f(p.purchases))+'</div></div>'+
+      '<div class="st"><div class="stl">'+creatorPurchaseLabel()+'</div><div class="stv '+((noAmz?p.shopnowclick:p.purchases)>0?'good':'')+'">'+f(noAmz?p.shopnowclick:p.purchases)+'</div></div>'+
       '<div class="st"><div class="stl">ROAS</div><div class="stv'+(p.roas>0?' good':'')+'">'+(noAmz?'—':fd(p.roas)+'%')+'</div></div>'+
       '</div>'+
       '<div class="mlabels"><span>Video '+vp+'%</span><span>Image '+(100-vp)+'%</span></div>'+
@@ -955,12 +970,13 @@ function renderPCards(){
 
 function renderTrend(){
   const d=D().daily||[];
+  const metric=creatorMetric();
   const labels={clicks:'Daily clicks',ctr:'Daily CTR (%)',cpc:'Daily CPC (₩)',
-    purchases:'Daily purchases',roas:'Daily ROAS (%)'};
-  document.getElementById('trendT').textContent=labels[cM]+' by creator';
+    shopnowclick:'Daily ShopNowClick',purchases:'Daily purchases',roas:'Daily ROAS (%)'};
+  document.getElementById('trendT').textContent=labels[metric]+' by creator';
   const dates=[...new Set(d.map(r=>r.date))].sort();
   const ds=function(person){return{label:person,
-    data:dates.map(dt=>{const r=d.find(x=>x.date===dt&&x.p===person);return r?r[cM]:null;}),
+    data:dates.map(dt=>{const r=d.find(x=>x.date===dt&&x.p===person);return r?r[metric]:null;}),
     borderColor:C[person],backgroundColor:C[person]+'22',
     borderWidth:2,pointRadius:2,pointHoverRadius:5,spanGaps:true,tension:.3,fill:false};};
   const ctx=document.getElementById('trendC').getContext('2d');
@@ -981,10 +997,11 @@ function renderTrend(){
 
 function renderMedia(){
   const pm=D().pm||[];
+  const metric=creatorMetric();
   const ppl=PEOPLE;
-  const gv=function(p,m){const r=pm.find(x=>x.person===p&&x.media===m);return r?r[cM]:0;};
-  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',purchases:'Purchases',roas:'ROAS (%)'};
-  document.getElementById('mediaT').textContent='Video vs image — '+mlabels[cM]+' by creator';
+  const gv=function(p,m){const r=pm.find(x=>x.person===p&&x.media===m);return r?r[metric]:0;};
+  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',shopnowclick:'ShopNowClick',purchases:'Purchases',roas:'ROAS (%)'};
+  document.getElementById('mediaT').textContent='Video vs image — '+mlabels[metric]+' by creator';
   const ctx=document.getElementById('mediaC').getContext('2d');
   if(mC)mC.destroy();
   mC=new Chart(ctx,{
