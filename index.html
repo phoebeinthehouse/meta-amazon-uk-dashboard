@@ -345,7 +345,6 @@ const AMZ_URL=NEW_API_URL+'?sheet='+encodeURIComponent('amz-raw');
 const ADS_LIST_URL=OLD_API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
 const META_NEW_START='2026-08-01';
 const AMZ_START='2026-07-23';
-const META_SOURCE_LABEL='meta-raw-new-uk → meta-raw';
 let AD_IMAGES=[];
 function driveUrl(u){const m=u.match(/\/d\/([^/?]+)/)||u.match(/[?&]id=([^&]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]+'=s400':u;}
 function getAdImg(adName,product,person,from,to,media){
@@ -868,7 +867,7 @@ function updateMeta(){
   const lbl=getDateLabel(),noAmz=isNoAmz(),partialAmz=isPartialAmz();
   ['creatorMeta','productMeta','creativeMeta','weeklyMeta','weeklyCreativeMeta'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el)el.textContent=lbl+' · '+META_SOURCE_LABEL+(noAmz?' · Meta only':partialAmz?' · Amazon from Jul 23':' · Meta + Amazon');
+    if(el)el.textContent=lbl+(noAmz?' · Meta only':partialAmz?' · Amazon from Jul 23':' · Meta + Amazon');
   });
   const notice=document.getElementById('novNotice');
   notice.style.display=(noAmz||partialAmz)?'block':'none';
