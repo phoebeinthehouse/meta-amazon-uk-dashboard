@@ -186,7 +186,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="tab active" onclick="switchM('clicks',this)">Clicks</button>
       <button class="tab" onclick="switchM('ctr',this)">CTR</button>
       <button class="tab" onclick="switchM('cpc',this)">CPC</button>
-      <button class="tab" onclick="switchM('purchases',this)">Purchases</button>
+      <button class="tab" id="creatorPurchaseTab" onclick="switchM('purchases',this)">Purchases</button>
       <button class="tab" onclick="switchM('roas',this)">ROAS</button>
     </div>
   </div>
@@ -781,6 +781,8 @@ function D(){const{from,to}=getDateRange();return computeData(from,to);}
 function getDateLabel(){return dateMode==='monthly'?monthLabel(curMonth):customFrom+' ~ '+customTo;}
 function isNoAmz(){const{to}=getDateRange();return to<AMZ_START;}
 function isPartialAmz(){const{from,to}=getDateRange();return from<AMZ_START&&to>=AMZ_START;}
+function creatorMetric(){return cM==='purchases'&&isNoAmz()?'shopnowclick':cM;}
+function creatorPurchaseLabel(){return isNoAmz()?'ShopNowClick':'Purchases';}
 
 function fmtLocalDate(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -875,6 +877,7 @@ function computeCreativeDaily(days,productFilter,personFilter){
 
 function updateMeta(){
   const lbl=getDateLabel(),noAmz=isNoAmz(),partialAmz=isPartialAmz();
+  document.getElementById('creatorPurchaseTab').textContent=creatorPurchaseLabel();
   ['creatorMeta','productMeta','creativeMeta','weeklyMeta','weeklyCreativeMeta'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.textContent=lbl+(noAmz?' · Meta only':partialAmz?' · Amazon from Jul 23':' · Meta + Amazon');
@@ -929,17 +932,19 @@ function goPage(pg,btn){
 
 function renderPCards(){
   const ps=D().ps||[];
+  const metric=creatorMetric();
   const sorted={
     clicks:[...ps].sort((a,b)=>b.clicks-a.clicks).map(x=>x.person),
     ctr:[...ps].sort((a,b)=>b.ctr-a.ctr).map(x=>x.person),
     cpc:[...ps].sort((a,b)=>a.cpc-b.cpc).map(x=>x.person),
+    shopnowclick:[...ps].sort((a,b)=>b.shopnowclick-a.shopnowclick).map(x=>x.person),
     purchases:[...ps].sort((a,b)=>b.purchases-a.purchases).map(x=>x.person),
     roas:[...ps].sort((a,b)=>b.roas-a.roas).map(x=>x.person)
   };
-  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',purchases:'Purchases',roas:'ROAS'};
+  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',shopnowclick:'ShopNowClick',purchases:'Purchases',roas:'ROAS'};
   const noAmz=isNoAmz();
   document.getElementById('pcards').innerHTML=ps.map(p=>{
-    const rank=sorted[cM].indexOf(p.person)+1;
+    const rank=sorted[metric].indexOf(p.person)+1;
     const pm=D().pm||[];
     const vdo=pm.find(m=>m.person===p.person&&m.media==='vdo');
     const img=pm.find(m=>m.person===p.person&&m.media==='img');
@@ -947,14 +952,14 @@ function renderPCards(){
     const vp=tc>0?Math.round((vdo?.clicks||0)/tc*100):0;
     return '<div class="pcard">'+
       '<div class="ph"><div class="av" style="background:'+CB[p.person]+';color:'+CT[p.person]+'">'+p.person[0]+'</div>'+
-      '<div><div class="pname">'+p.person+'</div><div class="prank">Rank #'+rank+' by '+rl[cM]+'</div></div></div>'+
+      '<div><div class="pname">'+p.person+'</div><div class="prank">Rank #'+rank+' by '+rl[metric]+'</div></div></div>'+
       '<div class="srow">'+
       '<div class="st"><div class="stl">Clicks</div><div class="stv">'+f(p.clicks)+'</div></div>'+
       '<div class="st"><div class="stl">CTR</div><div class="stv">'+fd(p.ctr)+'%</div></div>'+
       '<div class="st"><div class="stl">CPC</div><div class="stv">₩'+f(p.cpc)+'</div></div>'+
       '</div><div class="srow">'+
       '<div class="st"><div class="stl">Spend</div><div class="stv sm">₩'+f(p.spend)+'</div></div>'+
-      '<div class="st"><div class="stl">Purchases</div><div class="stv'+(p.purchases>0?' good':'')+'">'+(noAmz?'—':f(p.purchases))+'</div></div>'+
+      '<div class="st"><div class="stl">'+creatorPurchaseLabel()+'</div><div class="stv '+((noAmz?p.shopnowclick:p.purchases)>0?'good':'')+'">'+f(noAmz?p.shopnowclick:p.purchases)+'</div></div>'+
       '<div class="st"><div class="stl">ROAS</div><div class="stv'+(p.roas>0?' good':'')+'">'+(noAmz?'—':fd(p.roas)+'%')+'</div></div>'+
       '</div>'+
       '<div class="mlabels"><span>Video '+vp+'%</span><span>Image '+(100-vp)+'%</span></div>'+
@@ -965,12 +970,13 @@ function renderPCards(){
 
 function renderTrend(){
   const d=D().daily||[];
+  const metric=creatorMetric();
   const labels={clicks:'Daily clicks',ctr:'Daily CTR (%)',cpc:'Daily CPC (₩)',
-    purchases:'Daily purchases',roas:'Daily ROAS (%)'};
-  document.getElementById('trendT').textContent=labels[cM]+' by creator';
+    shopnowclick:'Daily ShopNowClick',purchases:'Daily purchases',roas:'Daily ROAS (%)'};
+  document.getElementById('trendT').textContent=labels[metric]+' by creator';
   const dates=[...new Set(d.map(r=>r.date))].sort();
   const ds=function(person){return{label:person,
-    data:dates.map(dt=>{const r=d.find(x=>x.date===dt&&x.p===person);return r?r[cM]:null;}),
+    data:dates.map(dt=>{const r=d.find(x=>x.date===dt&&x.p===person);return r?r[metric]:null;}),
     borderColor:C[person],backgroundColor:C[person]+'22',
     borderWidth:2,pointRadius:2,pointHoverRadius:5,spanGaps:true,tension:.3,fill:false};};
   const ctx=document.getElementById('trendC').getContext('2d');
@@ -991,10 +997,11 @@ function renderTrend(){
 
 function renderMedia(){
   const pm=D().pm||[];
+  const metric=creatorMetric();
   const ppl=PEOPLE;
-  const gv=function(p,m){const r=pm.find(x=>x.person===p&&x.media===m);return r?r[cM]:0;};
-  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',purchases:'Purchases',roas:'ROAS (%)'};
-  document.getElementById('mediaT').textContent='Video vs image — '+mlabels[cM]+' by creator';
+  const gv=function(p,m){const r=pm.find(x=>x.person===p&&x.media===m);return r?r[metric]:0;};
+  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',shopnowclick:'ShopNowClick',purchases:'Purchases',roas:'ROAS (%)'};
+  document.getElementById('mediaT').textContent='Video vs image — '+mlabels[metric]+' by creator';
   const ctx=document.getElementById('mediaC').getContext('2d');
   if(mC)mC.destroy();
   mC=new Chart(ctx,{
