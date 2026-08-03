@@ -342,13 +342,16 @@ const NEW_API_URL='https://script.google.com/macros/s/AKfycbyuwAWMPtF_zybgo3WVIn
 const OLD_META_URL=OLD_API_URL+'?sheet='+encodeURIComponent('meta-raw-new-uk');
 const NEW_META_URL=NEW_API_URL+'?sheet='+encodeURIComponent('meta-raw');
 const AMZ_URL=NEW_API_URL+'?sheet='+encodeURIComponent('amz-raw');
-const ADS_LIST_URL=OLD_API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
+const OLD_ADS_LIST_URL=OLD_API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
+const NEW_ADS_LIST_URL=NEW_API_URL+'?sheet='+encodeURIComponent('meta-ads-list');
 const META_NEW_START='2026-08-01';
 const AMZ_START='2026-07-23';
 let AD_IMAGES=[];
 function driveUrl(u){const m=u.match(/\/d\/([^/?]+)/)||u.match(/[?&]id=([^&]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]+'=s400':u;}
 function getAdImg(adName,product,person,from,to,media){
   if(!adName)return'';
+  const sourcePreference=from>=META_NEW_START?'new':to<META_NEW_START?'old':null;
+  const images=sourcePreference?AD_IMAGES.filter(x=>x.s===sourcePreference):AD_IMAGES;
   const lc=adName.toLowerCase();
   const personLc=(person&&person!=='Partner')?person.toLowerCase():null;
   const PC={'BCA/BPD':['BCA','BPD','PCF']};
@@ -369,14 +372,14 @@ function getAdImg(adName,product,person,from,to,media){
     return ranged.length?latest(ranged):arr[0];
   };
   if(codes.length){
-    const matches=AD_IMAGES.filter(x=>mt(x)&&codes.some(c=>x.n.split('_')[4]===c)&&mp(x)&&mm(x));
+    const matches=images.filter(x=>mt(x)&&codes.some(c=>x.n.split('_')[4]===c)&&mp(x)&&mm(x));
     if(matches.length){const e=best(matches);return driveUrl(e.u);}
   }
-  const matches=AD_IMAGES.filter(x=>mt(x)&&mp(x)&&mm(x));
+  const matches=images.filter(x=>mt(x)&&mp(x)&&mm(x));
   if(matches.length){const e=best(matches);return driveUrl(e.u);}
-  const nameMatches=AD_IMAGES.filter(x=>mt(x)&&mm(x));
+  const nameMatches=images.filter(x=>mt(x)&&mm(x));
   if(nameMatches.length){const e=best(nameMatches);return driveUrl(e.u);}
-  const anyMatches=AD_IMAGES.filter(x=>mt(x));
+  const anyMatches=images.filter(x=>mt(x));
   if(anyMatches.length){const e=best(anyMatches);return driveUrl(e.u);}
   return'';
 }
@@ -393,7 +396,7 @@ let RAW={meta:[],amz:[]};
 const CACHE_TTL=30*60*1000;
 function getCached(k){try{const i=localStorage.getItem(k);if(!i)return null;const{ts,d}=JSON.parse(i);if(Date.now()-ts>CACHE_TTL){localStorage.removeItem(k);return null;}return d;}catch(e){return null;}}
 function setCached(k,d){try{localStorage.setItem(k,JSON.stringify({ts:Date.now(),d}));}catch(e){}}
-function clearCache(){['old_meta_raw_uk_v2','new_meta_raw_uk_v2','new_amz_raw_uk_v2','meta_ads_list'].forEach(k=>localStorage.removeItem(k));}
+function clearCache(){['old_meta_raw_uk_v2','new_meta_raw_uk_v2','new_amz_raw_uk_v2','old_meta_ads_list_v2','new_meta_ads_list_v2'].forEach(k=>localStorage.removeItem(k));}
 let curPage='creator',cM='clicks',cPM='clicks';
 let dateMode='monthly',curMonth='2026-03',customFrom='',customTo='';
 let cFilters={person:'All',media:'All',product:'All'};
@@ -532,15 +535,17 @@ async function loadData(){
     // tab after meta-raw to avoid intermittent redirect/rate-limit failures.
     const amzText=await fetchTextCached('new_amz_raw_uk_v2',AMZ_URL,'Amazon sheet');
 
-    // Build ad_name → image URL map
+    // Build ad_name → image URL map. Jul and earlier use the old sheet;
+    // Aug onward uses the new sheet.
     AD_IMAGES=[];
     try{
-      const adsList=await fetchTextCached('meta_ads_list',ADS_LIST_URL,'Thumbnail sheet');
-      AD_IMAGES=arrToObjs(adsList).map(r=>{
+      const oldAdsList=await fetchTextCached('old_meta_ads_list_v2',OLD_ADS_LIST_URL,'Old thumbnail sheet');
+      const newAdsList=await fetchTextCached('new_meta_ads_list_v2',NEW_ADS_LIST_URL,'New thumbnail sheet');
+      const parseAdImages=(text,source)=>arrToObjs(text).map(r=>{
         const keys=Object.keys(r);
         const nameKey=keys.find(k=>/소재명|ad[ _-]?name|creative|file[ _-]?name|파일명|^name$/i.test(k));
         const urlKey=keys.find(k=>/썸네일|thumbnail|thumb|이미지|image|url|링크|link/i.test(k));
-        const dateKey=keys.find(k=>/일자|날짜|date/i.test(k));
+        const dateKey=keys.find(k=>/일자|날짜|date|스냅샷|snapshot|utc/i.test(k));
         const values=Object.values(r).map(v=>String(v||'').trim());
         const rawUrl=String((urlKey&&r[urlKey])||values.find(v=>/https?:\/\//i.test(v))||'');
         const urlMatch=rawUrl.match(/https?:\/\/[^"')\s]+/i);
@@ -548,9 +553,14 @@ async function loadData(){
         return{
           n:rawName,
           u:urlMatch?urlMatch[0]:'',
-          d:parseDateStr(dateKey?r[dateKey]:'')||''
+          d:parseDateStr(dateKey?r[dateKey]:'')||'',
+          s:source
         };
       }).filter(x=>x.n&&x.u);
+      const oldImages=parseAdImages(oldAdsList,'old').filter(x=>!x.d||x.d<META_NEW_START);
+      const newImages=parseAdImages(newAdsList,'new').filter(x=>!x.d||x.d>=META_NEW_START);
+      AD_IMAGES=[...oldImages,...newImages];
+      console.log('[THUMBNAIL SOURCES]',{old:oldImages.length,new:newImages.length,cutover:META_NEW_START});
     }catch(e){
       console.warn('[THUMBNAILS] meta-ads-list load failed:',e);
     }
