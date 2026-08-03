@@ -186,9 +186,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="tab active" onclick="switchM('clicks',this)">Clicks</button>
       <button class="tab" onclick="switchM('ctr',this)">CTR</button>
       <button class="tab" onclick="switchM('cpc',this)">CPC</button>
-      <button class="tab" onclick="switchM('shopnowclick',this)">ShopNowClick</button>
       <button class="tab" onclick="switchM('purchases',this)">Purchases</button>
-      <button class="tab" onclick="switchM('revenue_krw',this)">Revenue</button>
       <button class="tab" onclick="switchM('roas',this)">ROAS</button>
     </div>
   </div>
@@ -268,7 +266,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
     <div class="sort-tabs">
       <button class="sort-btn" onclick="setCS('clicks',this)">Clicks</button>
       <button class="sort-btn" onclick="setCS('ctr',this)">CTR</button>
-      <button class="sort-btn" onclick="setCS('shopnowclick',this)">ShopNowClick</button>
       <button class="sort-btn active" onclick="setCS('purchases',this)">Purchases</button>
       <button class="sort-btn" onclick="setCS('roas',this)">ROAS</button>
     </div>
@@ -287,11 +284,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
           <th onclick="setCS('spend',null)">Spend <span class="sort-arrow">↕</span></th>
           <th onclick="setCS('ctr',null)">CTR <span class="sort-arrow">↕</span></th>
           <th onclick="setCS('cpc',null)">CPC <span class="sort-arrow">↕</span></th>
-          <th onclick="setCS('shopnowclick',null)">ShopNowClick <span class="sort-arrow">↕</span></th>
           <th onclick="setCS('purchases',null)" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
-          <th onclick="setCS('revenue_krw',null)">Revenue <span class="sort-arrow">↕</span></th>
           <th onclick="setCS('roas',null)">ROAS <span class="sort-arrow">↕</span></th>
-          <th onclick="setCS('cpa',null)">CPA <span class="sort-arrow">↕</span></th>
         </tr></thead>
         <tbody id="creativeTbody"></tbody>
       </table>
@@ -930,12 +924,10 @@ function renderPCards(){
     clicks:[...ps].sort((a,b)=>b.clicks-a.clicks).map(x=>x.person),
     ctr:[...ps].sort((a,b)=>b.ctr-a.ctr).map(x=>x.person),
     cpc:[...ps].sort((a,b)=>a.cpc-b.cpc).map(x=>x.person),
-    shopnowclick:[...ps].sort((a,b)=>b.shopnowclick-a.shopnowclick).map(x=>x.person),
     purchases:[...ps].sort((a,b)=>b.purchases-a.purchases).map(x=>x.person),
-    revenue_krw:[...ps].sort((a,b)=>b.revenue_krw-a.revenue_krw).map(x=>x.person),
     roas:[...ps].sort((a,b)=>b.roas-a.roas).map(x=>x.person)
   };
-  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',shopnowclick:'ShopNowClick',purchases:'Purchases',revenue_krw:'Revenue',roas:'ROAS'};
+  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',purchases:'Purchases',roas:'ROAS'};
   const noAmz=isNoAmz();
   document.getElementById('pcards').innerHTML=ps.map(p=>{
     const rank=sorted[cM].indexOf(p.person)+1;
@@ -953,12 +945,8 @@ function renderPCards(){
       '<div class="st"><div class="stl">CPC</div><div class="stv">₩'+f(p.cpc)+'</div></div>'+
       '</div><div class="srow">'+
       '<div class="st"><div class="stl">Spend</div><div class="stv sm">₩'+f(p.spend)+'</div></div>'+
-      '<div class="st"><div class="stl">ShopNowClick</div><div class="stv'+(p.shopnowclick>0?' good':'')+'">'+f(p.shopnowclick)+'</div></div>'+
       '<div class="st"><div class="stl">Purchases</div><div class="stv'+(p.purchases>0?' good':'')+'">'+(noAmz?'—':f(p.purchases))+'</div></div>'+
-      '</div><div class="srow">'+
-      '<div class="st"><div class="stl">Revenue</div><div class="stv sm">'+(noAmz?'—':'₩'+f(p.revenue_krw))+'</div></div>'+
       '<div class="st"><div class="stl">ROAS</div><div class="stv'+(p.roas>0?' good':'')+'">'+(noAmz?'—':fd(p.roas)+'%')+'</div></div>'+
-      '<div class="st"><div class="stl">CPA</div><div class="stv sm">'+(noAmz?'—':(p.cpa>0?'₩'+f(p.cpa):'—'))+'</div></div>'+
       '</div>'+
       '<div class="mlabels"><span>Video '+vp+'%</span><span>Image '+(100-vp)+'%</span></div>'+
       '<div class="btrack"><div class="bfill" style="width:'+vp+'%;background:'+C[p.person]+'"></div></div>'+
@@ -968,8 +956,8 @@ function renderPCards(){
 
 function renderTrend(){
   const d=D().daily||[];
-  const labels={clicks:'Daily clicks',ctr:'Daily CTR (%)',cpc:'Daily CPC (₩)',shopnowclick:'Daily ShopNowClick',
-    purchases:'Daily purchases',revenue_krw:'Daily revenue (₩)',roas:'Daily ROAS (%)'};
+  const labels={clicks:'Daily clicks',ctr:'Daily CTR (%)',cpc:'Daily CPC (₩)',
+    purchases:'Daily purchases',roas:'Daily ROAS (%)'};
   document.getElementById('trendT').textContent=labels[cM]+' by creator';
   const dates=[...new Set(d.map(r=>r.date))].sort();
   const ds=function(person){return{label:person,
@@ -996,8 +984,7 @@ function renderMedia(){
   const pm=D().pm||[];
   const ppl=PEOPLE;
   const gv=function(p,m){const r=pm.find(x=>x.person===p&&x.media===m);return r?r[cM]:0;};
-  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',shopnowclick:'ShopNowClick',
-    purchases:'Purchases',revenue_krw:'Revenue (₩)',roas:'ROAS (%)'};
+  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',purchases:'Purchases',roas:'ROAS (%)'};
   document.getElementById('mediaT').textContent='Video vs image — '+mlabels[cM]+' by creator';
   const ctx=document.getElementById('mediaC').getContext('2d');
   if(mC)mC.destroy();
@@ -1309,7 +1296,7 @@ function renderCreativeTable(){
     return cSortDir*(av-bv);
   });
   if(!ads.length){
-    document.getElementById('creativeTbody').innerHTML='<tr><td colspan="14" class="no-data">해당 조건의 소재가 없어요.</td></tr>';
+    document.getElementById('creativeTbody').innerHTML='<tr><td colspan="11" class="no-data">해당 조건의 소재가 없어요.</td></tr>';
     document.getElementById('adPagination').innerHTML='';
     return;
   }
@@ -1334,11 +1321,8 @@ function renderCreativeTable(){
       '<td style="font-size:12px">₩'+f(a.spend)+'</td>'+
       '<td>'+fd(a.ctr)+'%</td>'+
       '<td>₩'+f(a.cpc)+'</td>'+
-      '<td style="font-weight:600;color:'+(a.shopnowclick>0?'#0F6E56':'var(--muted)')+'">'+(a.shopnowclick>0?f(a.shopnowclick):'—')+'</td>'+
       '<td style="font-weight:600;color:'+(a.purchases>0?'#0F6E56':'var(--muted)')+'">'+(a.purchases>0?a.purchases+'건':'—')+'</td>'+
-      '<td style="font-size:12px">'+(a.revenue_krw>0?'₩'+f(a.revenue_krw):'—')+'</td>'+
       '<td style="font-weight:600;color:'+(a.roas>0?'#0F6E56':'var(--muted)')+'">'+(a.roas>0?fd(a.roas)+'%':'—')+'</td>'+
-      '<td style="font-size:12px">'+(a.cpa>0?'₩'+f(a.cpa):'—')+'</td>'+
       '</tr>';
   }).join('');
   // Pagination
