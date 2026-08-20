@@ -363,7 +363,12 @@ function getAdImg(adName,product,person,from,to,media){
     return lc.includes('_')?fn.includes(lc):tokens.includes(lc);
   };
   const mp=x=>!personLc||x.n.toLowerCase().includes(personLc);
-  const mm=x=>!media||x.n.split('_').includes(media);
+  const mm=x=>{
+    if(!media)return true;
+    const tokens=x.n.toLowerCase().split('_');
+    return media==='img'?(tokens.includes('img')||tokens.includes('image')):
+      media==='vdo'?(tokens.includes('vdo')||tokens.includes('video')):true;
+  };
   const inDateRange=x=>x.d&&from&&x.d>=from&&x.d<=to;
   const latest=(arr)=>arr.reduce((a,b)=>b.d>a.d?b:a);
   const best=(arr)=>{
@@ -473,8 +478,8 @@ function parseProduct(name){
 }
 function parseMedia(name){
   if(!name)return null;
-  const parts=name.split('_');
-  return parts.includes('vdo')?'vdo':parts.includes('img')?'img':null;
+  const parts=name.toLowerCase().split('_');
+  return parts.includes('vdo')||parts.includes('video')?'vdo':parts.includes('img')||parts.includes('image')?'img':null;
 }
 function parseAdName(name){
   if(!name)return null;
@@ -510,6 +515,8 @@ async function loadData(){
         headers.forEach((h,i)=>obj[h]=String(row[i]||'').trim());
         // Product classification comes from column L rather than the ad-name format.
         Object.defineProperty(obj,'__columnL',{value:String(row[11]||'').trim(),enumerable:false});
+        // Thumbnail source is fixed to Google Sheets column M (zero-based index 12).
+        Object.defineProperty(obj,'__columnM',{value:String(row[12]||'').trim(),enumerable:false});
         return obj;
       });
     }
@@ -538,16 +545,15 @@ async function loadData(){
     // Aug onward uses the new sheet.
     AD_IMAGES=[];
     try{
-      const oldAdsList=await fetchTextCached('old_meta_ads_list_v2',OLD_ADS_LIST_URL,'Old thumbnail sheet');
-      const newAdsList=await fetchTextCached('new_meta_ads_list_v2',NEW_ADS_LIST_URL,'New thumbnail sheet');
+      const oldAdsList=await fetchTextCached('old_meta_ads_list_m_v3',OLD_ADS_LIST_URL,'Old thumbnail sheet');
+      const newAdsList=await fetchTextCached('new_meta_ads_list_m_v3',NEW_ADS_LIST_URL,'New thumbnail sheet');
       const parseAdImages=(text,source)=>arrToObjs(text).map(r=>{
         const keys=Object.keys(r);
         const nameKey=keys.find(k=>/소재명|ad[ _-]?name|creative|file[ _-]?name|파일명|^name$/i.test(k));
-        const urlKey=keys.find(k=>k.trim()==='이미지_URL')||
-          keys.find(k=>/썸네일|thumbnail|thumb|이미지|image|url|링크|link/i.test(k));
         const dateKey=keys.find(k=>/일자|날짜|date|스냅샷|snapshot|utc/i.test(k));
         const values=Object.values(r).map(v=>String(v||'').trim());
-        const rawUrl=String((urlKey&&r[urlKey])||values.find(v=>/https?:\/\//i.test(v))||'');
+        // Always read the thumbnail URL from column M, regardless of its header text.
+        const rawUrl=String(r.__columnM||'');
         const urlMatch=rawUrl.match(/https?:\/\/[^"')\s]+/i);
         const rawName=String((nameKey&&r[nameKey])||values.find(v=>v.includes('_')&&!/https?:\/\//i.test(v))||'').trim();
         return{
