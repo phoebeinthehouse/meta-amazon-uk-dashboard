@@ -543,7 +543,8 @@ async function loadData(){
       const parseAdImages=(text,source)=>arrToObjs(text).map(r=>{
         const keys=Object.keys(r);
         const nameKey=keys.find(k=>/소재명|ad[ _-]?name|creative|file[ _-]?name|파일명|^name$/i.test(k));
-        const urlKey=keys.find(k=>/썸네일|thumbnail|thumb|이미지|image|url|링크|link/i.test(k));
+        const urlKey=keys.find(k=>k.trim()==='이미지_URL')||
+          keys.find(k=>/썸네일|thumbnail|thumb|이미지|image|url|링크|link/i.test(k));
         const dateKey=keys.find(k=>/일자|날짜|date|스냅샷|snapshot|utc/i.test(k));
         const values=Object.values(r).map(v=>String(v||'').trim());
         const rawUrl=String((urlKey&&r[urlKey])||values.find(v=>/https?:\/\//i.test(v))||'');
