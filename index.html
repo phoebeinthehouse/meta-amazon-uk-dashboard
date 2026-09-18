@@ -533,20 +533,36 @@ async function loadData(){
       return text;
     }
 
-    const [oldMetaText,newMetaText]=await Promise.all([
-      fetchTextCached('old_meta_raw_uk_v2',OLD_META_URL,'Old Meta sheet'),
-      fetchTextCached('new_meta_raw_uk_v2',NEW_META_URL,'New Meta sheet')
+    async function fetchTextWithRetry(cacheKey,url,label){
+      try{return await fetchTextCached(cacheKey,url,label);}
+      catch(firstError){
+        console.warn('[RETRY] '+label,firstError);
+        await new Promise(resolve=>setTimeout(resolve,800));
+        return fetchTextCached(cacheKey,url,label);
+      }
+    }
+
+    // Current-period data controls the first screen, so do not block it on
+    // the historical sheet. The two current tabs load together; a transient
+    // Apps Script failure is retried once.
+    let oldMetaText=null;
+    const oldMetaPromise=fetchTextWithRetry('old_meta_raw_uk_v2',OLD_META_URL,'Old Meta sheet')
+      .then(text=>{oldMetaText=text;return text;})
+      .catch(error=>{console.warn('[HISTORICAL META] load failed:',error);return null;});
+    const [newMetaText,amzText]=await Promise.all([
+      fetchTextWithRetry('new_meta_raw_uk_v2',NEW_META_URL,'New Meta sheet'),
+      fetchTextWithRetry('new_amz_raw_uk_v2',AMZ_URL,'Amazon sheet')
     ]);
-    // The two new tabs share one Apps Script deployment; request the second
-    // tab after meta-raw to avoid intermittent redirect/rate-limit failures.
-    const amzText=await fetchTextCached('new_amz_raw_uk_v2',AMZ_URL,'Amazon sheet');
 
     // Build ad_name → image URL map. Jul and earlier use the old sheet;
     // Aug onward uses the new sheet.
     AD_IMAGES=[];
+    async function loadThumbnails(){
     try{
-      const oldAdsList=await fetchTextCached('old_meta_ads_list_m_v3',OLD_ADS_LIST_URL,'Old thumbnail sheet');
-      const newAdsList=await fetchTextCached('new_meta_ads_list_m_v3',NEW_ADS_LIST_URL,'New thumbnail sheet');
+      const [oldAdsList,newAdsList]=await Promise.all([
+        fetchTextWithRetry('old_meta_ads_list_m_v3',OLD_ADS_LIST_URL,'Old thumbnail sheet'),
+        fetchTextWithRetry('new_meta_ads_list_m_v3',NEW_ADS_LIST_URL,'New thumbnail sheet')
+      ]);
       const parseAdImages=(text,source)=>arrToObjs(text).map(r=>{
         const keys=Object.keys(r);
         const nameKey=keys.find(k=>/소재명|ad[ _-]?name|creative|file[ _-]?name|파일명|^name$/i.test(k));
@@ -570,6 +586,11 @@ async function loadData(){
     }catch(e){
       console.warn('[THUMBNAILS] meta-ads-list load failed:',e);
     }
+    }
+    loadThumbnails().then(()=>{
+      if(curPage==='creative')renderCreativeTable();
+      if(curPage==='weeklycreative')renderWeeklyCreativePage();
+    });
 
     function parseNum(v){return parseFloat(String(v||'0').replace(/,/g,'').replace(/-/g,'0'))||0;}
     function parseDateStr(raw){
@@ -645,27 +666,44 @@ async function loadData(){
       return result;
     }
 
-    const oldMeta=parseMetaRows(oldMetaText).filter(r=>r.date<META_NEW_START);
+    const oldMeta=oldMetaText?parseMetaRows(oldMetaText).filter(r=>r.date<META_NEW_START):[];
     const newMeta=parseMetaRows(newMetaText).filter(r=>r.date>=META_NEW_START);
     RAW.meta=[...oldMeta,...newMeta];
     RAW.amz=parseAmzRows(amzText).filter(r=>r.date>=AMZ_START);
+
+    function syncAvailableDates(selectLatest){
+      const allDates=[...RAW.meta.map(r=>r.date),...RAW.amz.map(r=>r.date)].filter(Boolean).sort();
+      if(allDates.length){
+        customFrom=allDates[0];customTo=allDates[allDates.length-1];
+        const df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo');
+        df.min=customFrom;df.max=customTo;df.value=customFrom;
+        dt.min=customFrom;dt.max=customTo;dt.value=customTo;
+      }
+      const months=[...new Set([...RAW.meta.map(r=>r.month),...RAW.amz.map(r=>r.month)].filter(Boolean))].sort();
+      const metaMonths=[...new Set(RAW.meta.map(r=>r.month).filter(Boolean))].sort();
+      if(selectLatest||!months.includes(curMonth)){
+        curMonth=metaMonths[metaMonths.length-1]||months[months.length-1]||'2026-03';
+      }
+      renderMonthPills(months);
+    }
+
     console.log('[DATA SOURCES]',{
       oldMetaRows:oldMeta.length,newMetaRows:newMeta.length,amazonRows:RAW.amz.length,
       metaCutover:META_NEW_START,amazonStart:AMZ_START
     });
-    const allDates=[...RAW.meta.map(r=>r.date),...RAW.amz.map(r=>r.date)].filter(Boolean).sort();
-    if(allDates.length){
-      customFrom=allDates[0];customTo=allDates[allDates.length-1];
-      const df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo');
-      df.min=customFrom;df.max=customTo;df.value=customFrom;
-      dt.min=customFrom;dt.max=customTo;dt.value=customTo;
-    }
-    const months=[...new Set([...RAW.meta.map(r=>r.month),...RAW.amz.map(r=>r.month)].filter(Boolean))].sort();
-    const metaMonths=[...new Set(RAW.meta.map(r=>r.month).filter(Boolean))].sort();
-    curMonth=metaMonths[metaMonths.length-1]||months[months.length-1]||'2026-03';
-    renderMonthPills(months);
+    syncAvailableDates(true);
     showLoading(false);
     refresh();
+
+    // Add historical months when ready without delaying the current dashboard.
+    oldMetaPromise.then(text=>{
+      if(!text||text===oldMetaText&&oldMeta.length)return;
+      const historical=parseMetaRows(text).filter(r=>r.date<META_NEW_START);
+      RAW.meta=[...historical,...RAW.meta.filter(r=>r.date>=META_NEW_START)];
+      syncAvailableDates(false);
+      refresh();
+      console.log('[HISTORICAL META READY]',{rows:historical.length});
+    });
   }catch(e){
     showLoading(false);
     const el=document.getElementById('loadError');
