@@ -524,11 +524,19 @@ async function loadData(){
       });
     }
 
-    const fetchOpts={redirect:'follow'};
-    async function fetchTextCached(cacheKey,url,label){
+    // Apps Script redirects to Google-hosted response URLs. Do not reuse an
+    // HTTP-cached redirect/error when the deployment temporarily returns 404.
+    const fetchOpts={redirect:'follow',cache:'no-store'};
+    async function fetchTextCached(cacheKey,url,label,retryAttempt=0){
       let text=getCached(cacheKey);
       if(text)return text;
-      const response=await fetch(url,fetchOpts);
+      let requestUrl=url;
+      if(retryAttempt){
+        const retryUrl=new URL(url);
+        retryUrl.searchParams.set('_retry',Date.now()+'-'+retryAttempt);
+        requestUrl=retryUrl.toString();
+      }
+      const response=await fetch(requestUrl,fetchOpts);
       if(!response.ok)throw new Error(label+' request failed ('+response.status+')');
       text=await response.text();
       try{JSON.parse(text);}catch(e){throw new Error(label+' returned invalid JSON');}
@@ -537,17 +545,19 @@ async function loadData(){
     }
 
     async function fetchTextWithRetry(cacheKey,url,label){
-      try{return await fetchTextCached(cacheKey,url,label);}
-      catch(firstError){
-        console.warn('[RETRY] '+label,firstError);
-        await new Promise(resolve=>setTimeout(resolve,800));
-        return fetchTextCached(cacheKey,url,label);
+      for(let attempt=0;attempt<3;attempt++){
+        try{return await fetchTextCached(cacheKey,url,label,attempt);}
+        catch(error){
+          if(attempt===2)throw error;
+          console.warn('[RETRY '+(attempt+1)+'/2] '+label,error);
+          await new Promise(resolve=>setTimeout(resolve,800*(attempt+1)));
+        }
       }
     }
 
     // Current-period data controls the first screen, so do not block it on
     // the historical sheet. The two current tabs load together; a transient
-    // Apps Script failure is retried once.
+    // Apps Script failure is retried twice with fresh request URLs.
     let oldMetaText=null;
     const oldMetaPromise=fetchTextWithRetry('old_meta_raw_uk_v2',OLD_META_URL,'Old Meta sheet')
       .then(text=>{oldMetaText=text;return text;})
