@@ -27,6 +27,8 @@ body{font-family:'DM Sans','Helvetica Neue',sans-serif;background:var(--bg);colo
 .custom-range{display:flex;align-items:center;gap:6px;}
 .date-input{padding:4px 10px;border-radius:var(--radius-sm);border:.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;outline:none;}
 .date-input:focus{border-color:var(--text);}
+.latest-date-btn{padding:4px 9px;border-radius:var(--radius-sm);border:.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
+.latest-date-btn:disabled{opacity:.4;cursor:default;}
 .apply-btn{padding:4px 14px;border-radius:var(--radius-sm);background:var(--text);color:var(--bg);font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .date-mode-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:var(--radius-sm);padding:2px;}
 .dmt{padding:3px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:inherit;transition:all .15s;text-transform:uppercase;letter-spacing:.04em;}
@@ -161,8 +163,10 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
     <div id="custom-range" style="display:none;" class="custom-range">
       <span class="date-label">From</span>
       <input type="date" class="date-input" id="dateFrom" value="2025-11-14">
+      <button type="button" class="latest-date-btn" id="latestFrom" onclick="setLatestDate('dateFrom')" aria-label="시작일을 최신 데이터 날짜로 선택" disabled>Latest</button>
       <span class="date-label">To</span>
       <input type="date" class="date-input" id="dateTo" value="2026-03-23">
+      <button type="button" class="latest-date-btn" id="latestTo" onclick="setLatestDate('dateTo')" aria-label="종료일을 최신 데이터 날짜로 선택" disabled>Latest</button>
       <button class="apply-btn" onclick="applyCustomRange()">Apply</button>
     </div>
   </div>
@@ -188,7 +192,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="tab" onclick="switchM('ctr',this)">CTR</button>
       <button class="tab" onclick="switchM('cpc',this)">CPC</button>
       <button class="tab" onclick="switchM('purchases',this)">Purchases</button>
-      <button class="tab" onclick="switchM('roas',this)">ROAS</button>
+      <button class="tab" onclick="switchM('roas',this)">추정 ROAS</button>
     </div>
   </div>
   <div class="slabel">Overview</div>
@@ -229,7 +233,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="pmtab" onclick="switchPM('shopnowclick',this)">ShopNowClick</button>
       <button class="pmtab" onclick="switchPM('purchases',this)">Purchases</button>
       <button class="pmtab" onclick="switchPM('revenue_krw',this)">Revenue</button>
-      <button class="pmtab" onclick="switchPM('roas',this)">ROAS</button>
+      <button class="pmtab" onclick="switchPM('roas',this)">추정 ROAS</button>
     </div>
   </div>
   <div class="slabel">Product summary</div>
@@ -267,7 +271,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="sort-btn" onclick="setCS('clicks',this)">Clicks</button>
       <button class="sort-btn" onclick="setCS('ctr',this)">CTR</button>
       <button class="sort-btn active" onclick="setCS('purchases',this)">Purchases</button>
-      <button class="sort-btn" onclick="setCS('roas',this)">ROAS</button>
+      <button class="sort-btn" onclick="setCS('roas',this)">추정 ROAS</button>
     </div>
   </div>
   <!-- Creative table -->
@@ -285,7 +289,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
           <th onclick="setCS('ctr',null)">CTR <span class="sort-arrow">↕</span></th>
           <th onclick="setCS('cpc',null)">CPC <span class="sort-arrow">↕</span></th>
           <th onclick="setCS('purchases',null)" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
-          <th onclick="setCS('roas',null)">ROAS <span class="sort-arrow">↕</span></th>
+          <th onclick="setCS('roas',null)">추정 ROAS <span class="sort-arrow">↕</span></th>
         </tr></thead>
         <tbody id="creativeTbody"></tbody>
       </table>
@@ -302,7 +306,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="pmtab" onclick="switchWM('shopnowclick',this)">ShopNowClick</button>
       <button class="pmtab active" onclick="switchWM('purchases',this)">Purchases</button>
       <button class="pmtab" onclick="switchWM('revenue_krw',this)">Revenue</button>
-      <button class="pmtab" onclick="switchWM('roas',this)">ROAS</button>
+      <button class="pmtab" onclick="switchWM('roas',this)">추정 ROAS</button>
     </div>
   </div>
   <div class="note" id="weeklyNote">선택한 기간의 일별 추이 · 중복 선택 가능</div>
@@ -318,7 +322,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
       <button class="pmtab" onclick="switchWCM('shopnowclick',this)">ShopNowClick</button>
       <button class="pmtab active" onclick="switchWCM('purchases',this)">Purchases</button>
       <button class="pmtab" onclick="switchWCM('revenue_krw',this)">Revenue</button>
-      <button class="pmtab" onclick="switchWCM('roas',this)">ROAS</button>
+      <button class="pmtab" onclick="switchWCM('roas',this)">추정 ROAS</button>
     </div>
   </div>
   <div class="note">선택한 기간의 일별 추이 · 중복 선택 가능 · 광고비 ₩30,000 이상 소재만 표시</div>
@@ -398,6 +402,9 @@ const PEOPLE=['Lina','Sarah','Phoebe','Iris'];
 const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function monthLabel(m){const[y,mo]=m.split('-');return(MONTH_NAMES[parseInt(mo,10)-1]||mo)+' '+y;}
 let RAW={meta:[],amz:[]};
+// Attribution captures an assumed 40% of conversions, matching the US estimate.
+const ATTRIBUTION_SHARE=0.4;
+function estimatedRoas(revenue,spend){return spend>0?revenue/spend*100/ATTRIBUTION_SHARE:0;}
 const CACHE_TTL=30*60*1000;
 function getCached(k){try{const i=localStorage.getItem(k);if(!i)return null;const{ts,d}=JSON.parse(i);if(Date.now()-ts>CACHE_TTL){localStorage.removeItem(k);return null;}return d;}catch(e){return null;}}
 function setCached(k,d){try{localStorage.setItem(k,JSON.stringify({ts:Date.now(),d}));}catch(e){}}
@@ -416,7 +423,7 @@ const f=n=>Math.round(n).toLocaleString('ko-KR');
 const fd=(n,d=2)=>Number(n).toFixed(d);
 const METRIC_LABELS={
   clicks:'Clicks',ctr:'CTR',cpc:'CPC',spend:'Spend',shopnowclick:'ShopNowClick',
-  purchases:'Purchases',revenue_krw:'Revenue',roas:'ROAS',cpa:'CPA'
+  purchases:'Purchases',revenue_krw:'Revenue',roas:'추정 ROAS',cpa:'CPA'
 };
 function formatMetric(metric,value){
   const v=Number(value)||0;
@@ -691,6 +698,11 @@ async function loadData(){
         const df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo');
         df.min=customFrom;df.max=customTo;df.value=customFrom;
         dt.min=customFrom;dt.max=customTo;dt.value=customTo;
+        ['latestFrom','latestTo'].forEach(id=>{
+          const btn=document.getElementById(id);
+          btn.disabled=false;
+          btn.title='최신 데이터 날짜: '+customTo;
+        });
       }
       const months=[...new Set([...RAW.meta.map(r=>r.month),...RAW.amz.map(r=>r.month)].filter(Boolean))].sort();
       const metaMonths=[...new Set(RAW.meta.map(r=>r.month).filter(Boolean))].sort();
@@ -757,12 +769,11 @@ function computeData(from,to){
   const amzNP=amz.filter(r=>r.person!=='Partner');
   const ctr_=(m)=>m.impressions>0?+(m.clicks/m.impressions*100).toFixed(2):0;
   const cpc_=(m)=>m.clicks>0?Math.round(m.spend/m.clicks):0;
-  const roas_=(spend,revenue)=>spend>0?+(revenue/spend*100).toFixed(2):0;
   const cpa_=(spend,purchases)=>purchases>0?Math.round(spend/purchases):0;
   const decorate=(m,a={purchases:0,revenue_krw:0})=>Object.assign({},m,{
     ctr:ctr_(m),cpc:cpc_(m),
     purchases:a.purchases||0,revenue_krw:a.revenue_krw||0,
-    roas:roas_(m.spend,a.revenue_krw||0),cpa:cpa_(m.spend,a.purchases||0)
+    roas:estimatedRoas(a.revenue_krw||0,m.spend),cpa:cpa_(m.spend,a.purchases||0)
   });
 
   const ps_m=grp(metaNP,['person'],['clicks','spend','impressions','shopnowclick']);
@@ -890,7 +901,7 @@ function computeProductDaily(days){
       const a=aMap.get(key)||{purchases:0,revenue_krw:0};
       return{date:d,clicks:m.clicks,spend:m.spend,ctr:ctr_(m),cpc:cpc_(m),shopnowclick:m.shopnowclick||0,
         purchases:a.purchases||0,revenue_krw:a.revenue_krw||0,
-        roas:m.spend>0?+((a.revenue_krw||0)/m.spend*100).toFixed(2):0,
+        roas:estimatedRoas(a.revenue_krw||0,m.spend),
         cpa:a.purchases>0?Math.round(m.spend/a.purchases):0};
     });
   });
@@ -918,7 +929,7 @@ function computeCreativeDaily(days,productFilter,personFilter){
       const a=aMap.get(mk)||{purchases:0,revenue_krw:0};
       return{date:d,clicks:m.clicks,spend:m.spend,ctr:ctr_(m),cpc:cpc_(m),shopnowclick:m.shopnowclick||0,
         purchases:a.purchases||0,revenue_krw:a.revenue_krw||0,
-        roas:m.spend>0?+((a.revenue_krw||0)/m.spend*100).toFixed(2):0,
+        roas:estimatedRoas(a.revenue_krw||0,m.spend),
         cpa:a.purchases>0?Math.round(m.spend/a.purchases):0};
     });
     totalSpend[key]=byCreative[key].reduce((s,r)=>s+r.spend,0);
@@ -961,6 +972,13 @@ function switchMonth(m,btn){
   btn.classList.add('active');
   refresh();
 }
+function setLatestDate(inputId){
+  const input=document.getElementById(inputId);
+  if(!input||!input.max)return;
+  input.value=input.max;
+  const df=document.getElementById('dateFrom'),dt=document.getElementById('dateTo');
+  if(df.value&&dt.value&&df.value>dt.value)dt.value=df.value;
+}
 function applyCustomRange(){
   customFrom=document.getElementById('dateFrom').value;
   customTo=document.getElementById('dateTo').value;
@@ -988,7 +1006,7 @@ function renderPCards(){
     purchases:[...ps].sort((a,b)=>b.purchases-a.purchases).map(x=>x.person),
     roas:[...ps].sort((a,b)=>b.roas-a.roas).map(x=>x.person)
   };
-  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',purchases:'Purchases',roas:'ROAS'};
+  const rl={clicks:'clicks',ctr:'CTR',cpc:'CPC (lower)',purchases:'Purchases',roas:'추정 ROAS'};
   const noAmz=isNoAmz();
   document.getElementById('pcards').innerHTML=ps.map(p=>{
     const rank=sorted[cM].indexOf(p.person)+1;
@@ -1007,7 +1025,7 @@ function renderPCards(){
       '</div><div class="srow">'+
       '<div class="st"><div class="stl">Spend</div><div class="stv sm">₩'+f(p.spend)+'</div></div>'+
       '<div class="st"><div class="stl">Purchases</div><div class="stv'+(p.purchases>0?' good':'')+'">'+(noAmz?'—':f(p.purchases))+'</div></div>'+
-      '<div class="st"><div class="stl">ROAS</div><div class="stv'+(p.roas>0?' good':'')+'">'+(noAmz?'—':fd(p.roas)+'%')+'</div></div>'+
+      '<div class="st"><div class="stl">추정 ROAS</div><div class="stv'+(p.roas>0?' good':'')+'">'+(noAmz?'—':fd(p.roas)+'%')+'</div></div>'+
       '</div>'+
       '<div class="mlabels"><span>Video '+vp+'%</span><span>Image '+(100-vp)+'%</span></div>'+
       '<div class="btrack"><div class="bfill" style="width:'+vp+'%;background:'+C[p.person]+'"></div></div>'+
@@ -1018,7 +1036,7 @@ function renderPCards(){
 function renderTrend(){
   const d=D().daily||[];
   const labels={clicks:'Daily clicks',ctr:'Daily CTR (%)',cpc:'Daily CPC (₩)',
-    purchases:'Daily purchases',roas:'Daily ROAS (%)'};
+    purchases:'Daily purchases',roas:'Daily 추정 ROAS (%)'};
   document.getElementById('trendT').textContent=labels[cM]+' by creator';
   const dates=[...new Set(d.map(r=>r.date))].sort();
   const ds=function(person){return{label:person,
@@ -1045,7 +1063,7 @@ function renderMedia(){
   const pm=D().pm||[];
   const ppl=PEOPLE;
   const gv=function(p,m){const r=pm.find(x=>x.person===p&&x.media===m);return r?r[cM]:0;};
-  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',purchases:'Purchases',roas:'ROAS (%)'};
+  const mlabels={clicks:'Clicks',ctr:'CTR (%)',cpc:'CPC (₩)',purchases:'Purchases',roas:'추정 ROAS (%)'};
   document.getElementById('mediaT').textContent='Video vs image — '+mlabels[cM]+' by creator';
   const ctx=document.getElementById('mediaC').getContext('2d');
   if(mC)mC.destroy();
@@ -1087,7 +1105,7 @@ function renderPSum(){
       '<div class="pml">ShopNowClick</div><div class="pmv" style="color:'+(p.shopnowclick>0?'#0F6E56':'var(--muted)')+'">'+f(p.shopnowclick)+'</div>'+
       '<div class="pml">Purchases</div><div class="pmv" style="color:'+(p.purchases>0?'#0F6E56':'var(--muted)')+'">'+(noAmz?'—':f(p.purchases))+'</div>'+
       '<div class="pml">Revenue</div><div class="pmv">'+(noAmz?'—':'₩'+f(p.revenue_krw))+'</div>'+
-      '<div class="pml">ROAS</div><div class="pmv" style="color:'+(p.roas>0?'#0F6E56':'var(--muted)')+'">'+(noAmz?'—':fd(p.roas)+'%')+'</div>'+
+      '<div class="pml">추정 ROAS</div><div class="pmv" style="color:'+(p.roas>0?'#0F6E56':'var(--muted)')+'">'+(noAmz?'—':fd(p.roas)+'%')+'</div>'+
       '<div class="pml">CPA</div><div class="pmv">'+(noAmz?'—':(p.cpa>0?'₩'+f(p.cpa):'—'))+'</div>'+
       '</div>';
   }).join('');
@@ -1098,7 +1116,7 @@ function renderPDGrid(){
   const pp=D().pp||[];
   const prods=[...new Set(pp.map(r=>r.product))];
   const mLabels={clicks:'CLICKS',ctr:'CTR',cpc:'CPC',spend:'SPEND',shopnowclick:'SHOPNOWCLICK',
-    purchases:'PURCHASES',revenue_krw:'REVENUE',roas:'ROAS'};
+    purchases:'PURCHASES',revenue_krw:'REVENUE',roas:'추정 ROAS'};
   document.getElementById('pdgrid').innerHTML=prods.map(function(prod){
     const rows=pp.filter(r=>r.product===prod);
     const vals=rows.map(r=>r[m]).filter(v=>v>0);
@@ -1160,7 +1178,7 @@ function renderWeeklyCharts(){
   const days=getWeeklyDays();
   if(!days.length){container.innerHTML='<div class="no-data">표시할 기간을 선택해주세요.</div>';return;}
   const{products,byProduct}=computeProductDaily(days);
-  const mLabels={shopnowclick:'ShopNowClick',purchases:'Purchases',revenue_krw:'Revenue',roas:'ROAS'};
+  const mLabels={shopnowclick:'ShopNowClick',purchases:'Purchases',revenue_krw:'Revenue',roas:'추정 ROAS'};
   const dayLabels=days.map(d=>{const p=d.split('-');return parseInt(p[1],10)+'/'+parseInt(p[2],10);});
   const rangeLabel=dayLabels[0]+'–'+dayLabels[dayLabels.length-1];
   if(!products.length){container.innerHTML='<div class="no-data">이 기간에는 데이터가 없어요.</div>';return;}
@@ -1255,7 +1273,7 @@ function renderWeeklyCreativeCharts(){
   const days=[...curWeeksWC].sort().flatMap(w=>{const a=[];for(let i=0;i<7;i++)a.push(addDays(w,i));return a;});
   if(!days.length){container.innerHTML='<div class="no-data">표시할 기간을 선택해주세요.</div>';return;}
   const{creatives,byCreative}=computeCreativeDaily(days,cFiltersWC.product,cFiltersWC.person);
-  const mLabels={shopnowclick:'ShopNowClick',purchases:'Purchases',revenue_krw:'Revenue',roas:'ROAS'};
+  const mLabels={shopnowclick:'ShopNowClick',purchases:'Purchases',revenue_krw:'Revenue',roas:'추정 ROAS'};
   const dayLabels=days.map(d=>{const p=d.split('-');return parseInt(p[1],10)+'/'+parseInt(p[2],10);});
   const rangeLabel=dayLabels[0]+'–'+dayLabels[dayLabels.length-1];
   if(!creatives.length){container.innerHTML='<div class="no-data">조건에 맞는 소재가 없어요 (광고비 ₩'+f(WC_MIN_SPEND)+' 이상).</div>';return;}
@@ -1428,5 +1446,6 @@ loadData();
   document.getElementById('imgModalImg').src=u.replace(/=s\d+$/,'=s0');
   document.getElementById('imgModal').style.display='flex';
 }</script>
+<footer id="roasLogic" class="note" style="max-width:1200px;margin:0 auto;padding:0 1.5rem 1.5rem;">추정 ROAS는 Amazon Attribution 기준 ROAS에 보정계수 2.5를 적용한 수치입니다.</footer>
 </body>
 </html>
