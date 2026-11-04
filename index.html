@@ -509,6 +509,8 @@ function parseAdName(name){
       const last=rest[rest.length-1];
       // Partnership ads: last token ends with -p → join all tokens and strip -p suffix
       if(last.endsWith('-p')){rest[rest.length-1]=last.slice(0,-2);return rest.join('_');}
+      // UKDEAL_102001_seoyoon: the number distinguishes creatives despite the extra underscore.
+      if(rest.length===3 && rest[0]==='UKDEAL' && /^\d{6}$/.test(rest[1]) && rest[2].toLowerCase()==='seoyoon')return rest[0]+'_'+rest[1];
       return parts[i+1];
     }
   }
