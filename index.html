@@ -672,11 +672,16 @@ async function loadData(){
         if(!date){if(purch>0||revenue>0)dropped.push({reason:'date_fail',raw_date:r[dateKey],purch,revenue});return null;}
         const nameKey=keys.find(k=>k.includes('소재명'))||keys[1]||'';
         const rawName=String(r[nameKey]||'').trim();
-        const person=parsePerson(rawName);
+        // Amazon started appending -CREATIVE to UK names in October. Strip it
+        // only for matching; keep the source row and its metrics unchanged.
+        const matchName=date>='2026-10-01'
+          ?rawName.replace(/-CREATIVE(?=_|$)/gi,'')
+          :rawName;
+        const person=parsePerson(matchName);
         if(!person){if(purch>0||revenue>0)dropped.push({reason:'person_fail',rawName,date,purch,revenue});return null;}
-        const product=parseProduct(r.__columnL)||parseProduct(rawName);
-        const ad_name=parseAdName(rawName);
-        return{date,month:date.slice(0,7),person,product,media:parseMedia(rawName),ad_name,
+        const product=parseProduct(r.__columnL)||parseProduct(matchName);
+        const ad_name=parseAdName(matchName);
+        return{date,month:date.slice(0,7),person,product,media:parseMedia(matchName),ad_name,
           campaign_type:rawName.split('_')[0]||null,purchases:purch,revenue_krw:revenue};
       }).filter(Boolean);
       if(dropped.length)console.log('[AMZ DROPPED] 구매있는데 필터된 행:',dropped);
