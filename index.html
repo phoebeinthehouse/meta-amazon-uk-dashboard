@@ -206,6 +206,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
         <div class="li"><span class="ld" style="background:#1D9E75"></span>Sarah</div>
         <div class="li"><span class="ld" style="background:#9B59B6"></span>Iris</div>
         <div class="li"><span class="ld" style="background:#BA7517"></span>Donnie</div>
+        <div class="li"><span class="ld" style="background:#0F766E"></span>Lia</div>
       </div>
     </div>
     <div style="position:relative;width:100%;height:220px;"><canvas id="trendC"></canvas></div>
@@ -263,6 +264,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
     <button class="fb" onclick="setCF('person','Sarah',this)">Sarah</button>
     <button class="fb" onclick="setCF('person','Iris',this)">Iris</button>
     <button class="fb" onclick="setCF('person','Donnie',this)">Donnie</button>
+    <button class="fb" onclick="setCF('person','Lia',this)">Lia</button>
     <button class="fb" onclick="setCF('person','Partner',this)">Partnership</button>
     <span class="filter-label" style="margin-left:8px">Media</span>
     <button class="fb active" onclick="setCF('media','All',this)">All</button>
@@ -338,6 +340,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--surface2);}
     <button class="fb" onclick="setWCFilter('person','Sarah',this)">Sarah</button>
     <button class="fb" onclick="setWCFilter('person','Iris',this)">Iris</button>
     <button class="fb" onclick="setWCFilter('person','Donnie',this)">Donnie</button>
+    <button class="fb" onclick="setWCFilter('person','Lia',this)">Lia</button>
     <button class="fb" onclick="setWCFilter('person','Partner',this)">Partnership</button>
   </div>
   <div id="weeklyCreativeCharts"></div>
@@ -395,13 +398,13 @@ function getAdImg(adName,product,person,from,to,media){
   if(anyMatches.length){const e=best(anyMatches);return driveUrl(e.u);}
   return'';
 }
-const C={Lina:'#378ADD',Phoebe:'#D4537E',Sarah:'#1D9E75',Iris:'#9B59B6',Donnie:'#BA7517',Partner:'#5C6570'};
-const CB={Lina:'#E6F1FB',Phoebe:'#FBEAF0',Sarah:'#E1F5EE',Iris:'#F0E6F6',Donnie:'#FAEEDA',Partner:'#EEF0F2'};
-const CT={Lina:'#0C447C',Phoebe:'#72243E',Sarah:'#085041',Iris:'#5B2D6E',Donnie:'#633806',Partner:'#3D454D'};
+const C={Lina:'#378ADD',Phoebe:'#D4537E',Sarah:'#1D9E75',Iris:'#9B59B6',Donnie:'#BA7517',Lia:'#0F766E',Partner:'#5C6570'};
+const CB={Lina:'#E6F1FB',Phoebe:'#FBEAF0',Sarah:'#E1F5EE',Iris:'#F0E6F6',Donnie:'#FAEEDA',Lia:'#DDF5F1',Partner:'#EEF0F2'};
+const CT={Lina:'#0C447C',Phoebe:'#72243E',Sarah:'#085041',Iris:'#5B2D6E',Donnie:'#633806',Lia:'#0B534D',Partner:'#3D454D'};
 const PC={'GPG':'#7F77DD','PCO':'#1D9E75','DCO':'#D4537E','BCA/BPD':'#D85A30','PCM':'#BA7517','GS':'#D9A006','GSP':'#5B8AD9','OTC':'#2A7AB5'};
 const PB={'GPG':'#EEEDFE','PCO':'#E1F5EE','DCO':'#FBEAF0','BCA/BPD':'#FAECE7','PCM':'#FAEEDA','GS':'#FEF6E0','GSP':'#E8EFF9','OTC':'#E3F0FA'};
 const PT={'GPG':'#3C3489','PCO':'#085041','DCO':'#72243E','BCA/BPD':'#993C1D','PCM':'#633806','GS':'#6E5003','GSP':'#2B4A7A','OTC':'#14395A'};
-const PEOPLE=['Lina','Sarah','Phoebe','Iris','Donnie'];
+const PEOPLE=['Lina','Sarah','Phoebe','Iris','Donnie','Lia'];
 const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function monthLabel(m){const[y,mo]=m.split('-');return(MONTH_NAMES[parseInt(mo,10)-1]||mo)+' '+y;}
 let RAW={meta:[],amz:[]};
@@ -636,6 +639,7 @@ async function loadData(){
         const keys=Object.keys(r);
         const dateKey=keys.find(k=>k.includes('일자')||k.includes('날짜'))||keys[0];
         const nameKey=keys.find(k=>k.includes('소재명'))||keys[1]||'';
+        const campaignKey=keys.find(k=>k.includes('캠페인명'))||'';
         const clickKey=keys.find(k=>k.includes('링크클릭'))||'';
         const spendKey=keys.find(k=>k.includes('광고비'))||'';
         const impKey=keys.find(k=>k.includes('노출'))||'';
@@ -647,7 +651,7 @@ async function loadData(){
         if(!person){if(name)droppedNoPerson.push(name);return null;}
         return{date,month:date.slice(0,7),person,
           product:parseProduct(r.__columnL)||parseProduct(name),media:parseMedia(name),ad_name:parseAdName(name),raw_name:name,
-          campaign_type:name.split('_')[0]||null,
+          campaign_type:String(r[campaignKey]||'').trim()||name.split('_')[0]||null,
           clicks:parseNum(r[clickKey]),spend:parseNum(r[spendKey]),impressions:parseNum(r[impKey]),
           shopnowclick:parseNum(r[sncKey])};
       }).filter(Boolean);
@@ -671,13 +675,18 @@ async function loadData(){
         const date=parseDateStr(r[dateKey]);
         if(!date){if(purch>0||revenue>0)dropped.push({reason:'date_fail',raw_date:r[dateKey],purch,revenue});return null;}
         const nameKey=keys.find(k=>k.includes('소재명'))||keys[1]||'';
+        const campaignKey=keys.find(k=>k.includes('캠페인명'))||'';
         const rawName=String(r[nameKey]||'').trim();
-        const person=parsePerson(rawName);
+        // October UK Amazon creative IDs append this suffix after the creator.
+        // Normalize only the matching name; do not change the raw source.
+        const matchName=date>='2026-10-01'?rawName.replace(/-CREATIVE$/i,''):rawName;
+        const person=parsePerson(matchName);
         if(!person){if(purch>0||revenue>0)dropped.push({reason:'person_fail',rawName,date,purch,revenue});return null;}
-        const product=parseProduct(r.__columnL)||parseProduct(rawName);
-        const ad_name=parseAdName(rawName);
-        return{date,month:date.slice(0,7),person,product,media:parseMedia(rawName),ad_name,
-          campaign_type:rawName.split('_')[0]||null,purchases:purch,revenue_krw:revenue};
+        const product=parseProduct(r.__columnL)||parseProduct(matchName);
+        const ad_name=parseAdName(matchName);
+        return{date,month:date.slice(0,7),person,product,media:parseMedia(matchName),ad_name,
+          campaign_type:String(r[campaignKey]||'').trim()||rawName.split('_')[0]||null,
+          purchases:purch,revenue_krw:revenue};
       }).filter(Boolean);
       if(dropped.length)console.log('[AMZ DROPPED] 구매있는데 필터된 행:',dropped);
       // 누락 진단: product null인 구매 행
@@ -815,11 +824,9 @@ function computeData(from,to){
   });
 
   const adGroupKeys=splitByCampaign?['ad_name','person','product','media','campaign_type']:['ad_name','person','product','media'];
-  const amzGroupKeys=splitByCampaign?['ad_name','person','product','campaign_type']:['ad_name','person','product'];
+  const amzGroupKeys=splitByCampaign?['ad_name','person','product','media','campaign_type']:['ad_name','person','product'];
   const ads_m=grp(meta,adGroupKeys,['clicks','spend','impressions','shopnowclick']);
   const ads_a=grp(amz,amzGroupKeys,['purchases','revenue_krw']);
-  // Meta-AMZ join은 campaign_type 제외 (Meta는 한국어, AMZ는 영문 코드라 불일치)
-  const ads_a_join=splitByCampaign?grp(amz,['ad_name','person','product'],['purchases','revenue_krw']):ads_a;
   const joinKey=(r)=>r.ad_name+'|||'+r.person+'|||'+r.product;
   // 누락 진단: ad_name null (vdo/img 없는 소재명) per product
   const nullAdNameAds=ads_m.filter(m=>(!m.ad_name||m.ad_name==='null')&&m.product);
@@ -827,18 +834,46 @@ function computeData(from,to){
     const cnt={};nullAdNameAds.forEach(r=>{cnt[r.product]=(cnt[r.product]||0)+1;});
     console.log('[META DROPPED ad_name] vdo/img 없어서 누락된 소재 per product:',cnt);
   }
-  // Meta rows are enriched with Amazon purchases and KRW revenue by creative.
-  const metaAds=ads_m.filter(m=>m.ad_name&&m.ad_name!='null'&&m.product).map(m=>{
-    const a=ads_a_join.find(x=>joinKey(x)===joinKey(m));
-    return decorate(m,a);
-  });
-  // AMZ 전용 rows (Meta에 없지만 구매 있는 소재)
-  const metaKeys=new Set(ads_m.filter(m=>m.ad_name&&m.product).map(m=>joinKey(m)));
-  const amzOnly=ads_a.filter(x=>(x.purchases>0||x.revenue_krw>0)&&x.ad_name&&x.product&&!metaKeys.has(joinKey(x)))
-    .map(x=>decorate({
-      ad_name:x.ad_name,person:x.person,product:x.product,campaign_type:x.campaign_type||null,
-      media:null,clicks:0,spend:0,impressions:0,shopnowclick:0
-    },x));
+  let metaAds,amzOnly;
+  if(splitByCampaign){
+    // Attach each Amazon campaign row once. Prefer the exact campaign; renamed
+    // Amazon campaigns (e.g. BSD) can use a sole Meta candidate for that ad.
+    // Ambiguous rows stay Amazon-only instead of being duplicated across campaigns.
+    const eligible=ads_m.filter(m=>m.ad_name&&m.ad_name!='null'&&m.product);
+    const candidates=new Map(),assigned=new Map(),unassigned=[];
+    for(const m of eligible){
+      const k=joinKey(m)+'|||'+m.media;
+      if(!candidates.has(k))candidates.set(k,[]);
+      candidates.get(k).push(m);
+    }
+    for(const a of ads_a){
+      const matches=candidates.get(joinKey(a)+'|||'+a.media)||[];
+      const target=matches.find(m=>m.campaign_type===a.campaign_type)||
+        (matches.length===1?matches[0]:null);
+      if(!target){unassigned.push(a);continue;}
+      const total=assigned.get(target)||{purchases:0,revenue_krw:0};
+      total.purchases+=a.purchases;
+      total.revenue_krw+=a.revenue_krw;
+      assigned.set(target,total);
+    }
+    metaAds=eligible.map(m=>decorate(m,assigned.get(m)));
+    amzOnly=unassigned.filter(x=>(x.purchases>0||x.revenue_krw>0)&&x.ad_name&&x.product)
+      .map(x=>decorate({
+        ad_name:x.ad_name,person:x.person,product:x.product,campaign_type:x.campaign_type||null,
+        media:x.media,clicks:0,spend:0,impressions:0,shopnowclick:0
+      },x));
+  }else{
+    metaAds=ads_m.filter(m=>m.ad_name&&m.ad_name!='null'&&m.product).map(m=>{
+      const a=ads_a.find(x=>joinKey(x)===joinKey(m));
+      return decorate(m,a);
+    });
+    const metaKeys=new Set(ads_m.filter(m=>m.ad_name&&m.product).map(m=>joinKey(m)));
+    amzOnly=ads_a.filter(x=>(x.purchases>0||x.revenue_krw>0)&&x.ad_name&&x.product&&!metaKeys.has(joinKey(x)))
+      .map(x=>decorate({
+        ad_name:x.ad_name,person:x.person,product:x.product,campaign_type:x.campaign_type||null,
+        media:null,clicks:0,spend:0,impressions:0,shopnowclick:0
+      },x));
+  }
   const ads=[...metaAds,...amzOnly].sort((a,b)=>b.clicks-a.clicks);
 
   return{ps,pm,daily,pp,psum,ads};
@@ -1337,7 +1372,7 @@ function setProdFilter(p,btn){cFilters.product=p;adPage=0;renderProdPills();rend
 
 function setCF(key,val,btn){
   cFilters[key]=val;
-  const group=key==='person'?['All','Lina','Phoebe','Sarah','Iris','Donnie','Partner']:['All','vdo','img'];
+  const group=key==='person'?['All','Lina','Phoebe','Sarah','Iris','Donnie','Lia','Partner']:['All','vdo','img'];
   document.querySelectorAll('.filter-bar .fb').forEach(function(b){
     const txt=b.textContent.trim();
     const inGroup=group.some(g=>g===txt||(g==='vdo'&&txt==='Video')||(g==='img'&&txt==='Image'));
